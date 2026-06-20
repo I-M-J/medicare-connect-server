@@ -176,6 +176,72 @@ const verifyPatient = async (req, res, next) => {
     }
 };
 
+// ============================================================
+// USER ROUTES
+// ============================================================
+app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const result = await usersCollection.find({}).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch users', error: error.message });
+    }
+});
+
+app.get('/users/me', verifyToken, async (req, res) => {
+    try {
+        const email = req.user?.email;
+        const user = await usersCollection.findOne({ email });
+        res.send(user || {});
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch user', error: error.message });
+    }
+});
+
+app.post('/users', async (req, res) => {
+    try {
+        const user = req.body;
+        const existing = await usersCollection.findOne({ email: user.email });
+        if (existing) {
+            return res.send({ message: 'User already exists', inserted: false });
+        }
+        const newUser = { ...user, createdAt: new Date(), status: 'active' };
+        const result = await usersCollection.insertOne(newUser);
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create user', error: error.message });
+    }
+});
+
+app.patch('/users/:id/status', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { status } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { status } };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update user status', error: error.message });
+    }
+});
+
+app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await usersCollection.deleteOne(query);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to delete user', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
