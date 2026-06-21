@@ -242,6 +242,139 @@ app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
+// ============================================================
+// DOCTOR ROUTES
+// ============================================================
+app.get('/doctors', async (req, res) => {
+    try {
+        const { search, specialization, sortBy, page, limit } = req.query;
+        const query = {};
+
+        if (search) {
+            query.$or = [
+                { doctorName: { $regex: search, $options: 'i' } },
+                { specialization: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (specialization) {
+            query.specialization = { $regex: specialization, $options: 'i' };
+        }
+
+        let sortOption = {};
+        if (sortBy === 'fee_asc') sortOption = { consultationFee: 1 };
+        else if (sortBy === 'fee_desc') sortOption = { consultationFee: -1 };
+        else if (sortBy === 'experience') sortOption = { experience: -1 };
+        else if (sortBy === 'rating') sortOption = { averageRating: -1 };
+
+        const parsedPage = parseInt(page) || 1;
+        const parsedLimit = parseInt(limit) || 9;
+        const skip = (parsedPage - 1) * parsedLimit;
+
+        const total = await doctorsCollection.countDocuments(query);
+        const doctors = await doctorsCollection.find(query).sort(sortOption).skip(skip).limit(parsedLimit).toArray();
+
+        res.send({ total, doctors, page: parsedPage, totalPages: Math.ceil(total / parsedLimit) });
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch doctors', error: error.message });
+    }
+});
+
+app.get('/doctors/featured', async (req, res) => {
+    try {
+        const doctors = await doctorsCollection.find({ verificationStatus: 'verified' }).limit(6).toArray();
+        res.send(doctors);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch featured doctors', error: error.message });
+    }
+});
+
+app.get('/doctors/my', verifyToken, async (req, res) => {
+    try {
+        const email = req.user?.email;
+        const doctor = await doctorsCollection.findOne({ email });
+        res.send(doctor || {});
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch doctor profile', error: error.message });
+    }
+});
+
+app.get('/doctors/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid doctor ID' });
+        }
+        const query = { _id: new ObjectId(id) };
+        const doctor = await doctorsCollection.findOne(query);
+        if (!doctor) {
+            return res.status(404).send({ message: 'Doctor not found' });
+        }
+        res.send(doctor);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch doctor', error: error.message });
+    }
+});
+
+app.post('/doctors', verifyToken, async (req, res) => {
+    try {
+        const doctor = req.body;
+        const newDoctor = {
+            ...doctor,
+            verificationStatus: 'pending',
+            averageRating: 0,
+            totalReviews: 0,
+            createdAt: new Date()
+        };
+        const result = await doctorsCollection.insertOne(newDoctor);
+
+        // update user role to doctor
+        await usersCollection.updateOne({ email: doctor.email }, { $set: { role: 'doctor' } });
+
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create doctor profile', error: error.message });
+    }
+});
+
+app.patch('/doctors/:id', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid doctor ID' });
+        }
+        const updatedData = { ...req.body };
+        delete updatedData._id;
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: updatedData };
+        const result = await doctorsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update doctor', error: error.message });
+    }
+});
+
+app.patch('/doctors/:id/verify', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { verificationStatus } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { verificationStatus } };
+        const result = await doctorsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update verification status', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
