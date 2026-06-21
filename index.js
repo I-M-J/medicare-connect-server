@@ -375,6 +375,109 @@ app.patch('/doctors/:id/verify', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
+// ============================================================
+// APPOINTMENT ROUTES
+// ============================================================
+app.get('/appointments', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const result = await appointmentsCollection.find({}).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch appointments', error: error.message });
+    }
+});
+
+app.get('/appointments/patient', verifyToken, async (req, res) => {
+    try {
+        const email = req.user?.email;
+        const query = { patientEmail: email };
+        const result = await appointmentsCollection.find(query).sort({ appointmentDate: -1 }).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch patient appointments', error: error.message });
+    }
+});
+
+app.get('/appointments/doctor', verifyToken, async (req, res) => {
+    try {
+        const email = req.user?.email;
+        const query = { doctorEmail: email };
+        const result = await appointmentsCollection.find(query).sort({ appointmentDate: -1 }).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch doctor appointments', error: error.message });
+    }
+});
+
+app.post('/appointments', verifyToken, async (req, res) => {
+    try {
+        const appointment = req.body;
+        const newAppointment = {
+            ...appointment,
+            appointmentStatus: 'pending',
+            paymentStatus: 'paid',
+            createdAt: new Date()
+        };
+        const result = await appointmentsCollection.insertOne(newAppointment);
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create appointment', error: error.message });
+    }
+});
+
+app.patch('/appointments/:id/status', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid appointment ID' });
+        }
+        const { appointmentStatus } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { appointmentStatus } };
+        const result = await appointmentsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update appointment status', error: error.message });
+    }
+});
+
+app.patch('/appointments/:id/reschedule', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid appointment ID' });
+        }
+        const { appointmentDate, appointmentTime } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { appointmentDate, appointmentTime, appointmentStatus: 'pending' } };
+        const result = await appointmentsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to reschedule appointment', error: error.message });
+    }
+});
+
+app.delete('/appointments/:id', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid appointment ID' });
+        }
+        const query = { _id: new ObjectId(id) };
+        const result = await appointmentsCollection.deleteOne(query);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to cancel appointment', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
