@@ -604,6 +604,56 @@ app.post('/create-payment-intent', verifyToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// PRESCRIPTION ROUTES
+// ============================================================
+app.get('/prescriptions', verifyToken, async (req, res) => {
+    try {
+        const { appointmentId, patientEmail, doctorEmail } = req.query;
+        const query = {};
+        if (appointmentId) query.appointmentId = appointmentId;
+        if (patientEmail) query.patientEmail = patientEmail;
+        if (doctorEmail) query.doctorEmail = doctorEmail;
+
+        const result = await prescriptionsCollection.find(query).sort({ createdAt: -1 }).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch prescriptions', error: error.message });
+    }
+});
+
+app.post('/prescriptions', verifyToken, async (req, res) => {
+    try {
+        const prescription = req.body;
+        const newPrescription = { ...prescription, createdAt: new Date() };
+        const result = await prescriptionsCollection.insertOne(newPrescription);
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create prescription', error: error.message });
+    }
+});
+
+app.patch('/prescriptions/:id', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid prescription ID' });
+        }
+        const updatedData = { ...req.body };
+        delete updatedData._id;
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: updatedData };
+        const result = await prescriptionsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update prescription', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
