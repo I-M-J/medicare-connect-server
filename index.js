@@ -555,6 +555,55 @@ app.delete('/reviews/:id', verifyToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// PAYMENT ROUTES
+// ============================================================
+app.get('/payments', verifyToken, async (req, res) => {
+    try {
+        const email = req.user?.email;
+        const userDoc = await usersCollection.findOne({ email });
+        const query = userDoc?.role === 'admin' ? {} : { patientEmail: email };
+        const result = await paymentsCollection.find(query).sort({ paymentDate: -1 }).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch payments', error: error.message });
+    }
+});
+
+app.post('/payments', verifyToken, async (req, res) => {
+    try {
+        const payment = req.body;
+        const newPayment = { ...payment, paymentDate: new Date() };
+        const result = await paymentsCollection.insertOne(newPayment);
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to record payment', error: error.message });
+    }
+});
+
+// Stripe checkout session
+app.post('/create-payment-intent', verifyToken, async (req, res) => {
+    try {
+        const { amount, doctorName, appointmentDate } = req.body;
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(amount * 100), // convert to cents
+            currency: 'usd',
+            metadata: {
+                doctorName,
+                appointmentDate
+            }
+        });
+
+        res.send({ clientSecret: paymentIntent.client_secret });
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create payment intent', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
