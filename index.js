@@ -654,6 +654,47 @@ app.patch('/prescriptions/:id', verifyToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// ADMIN ANALYTICS ROUTE
+// ============================================================
+app.get('/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const totalDoctors = await doctorsCollection.countDocuments({});
+        const verifiedDoctors = await doctorsCollection.countDocuments({ verificationStatus: 'verified' });
+        const pendingDoctors = await doctorsCollection.countDocuments({ verificationStatus: 'pending' });
+        const totalPatients = await usersCollection.countDocuments({ role: 'patient' });
+        const totalAppointments = await appointmentsCollection.countDocuments({});
+        const completedAppointments = await appointmentsCollection.countDocuments({ appointmentStatus: 'completed' });
+        const totalRevenue = await paymentsCollection.aggregate([
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]).toArray();
+
+        // top rated doctors for chart
+        const topDoctors = await doctorsCollection.find({ verificationStatus: 'verified' }).sort({ averageRating: -1 }).limit(5).toArray();
+
+        // appointment status distribution
+        const appointmentStats = await appointmentsCollection.aggregate([
+            { $group: { _id: '$appointmentStatus', count: { $sum: 1 } } },
+            { $project: { status: '$_id', count: 1, _id: 0 } }
+        ]).toArray();
+
+        res.send({
+            totalDoctors,
+            verifiedDoctors,
+            pendingDoctors,
+            totalPatients,
+            totalAppointments,
+            completedAppointments,
+            totalRevenue: totalRevenue[0]?.total || 0,
+            topDoctors,
+            appointmentStats
+        });
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch analytics', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
