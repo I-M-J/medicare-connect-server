@@ -478,6 +478,83 @@ app.delete('/appointments/:id', verifyToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// REVIEW ROUTES
+// ============================================================
+app.get('/reviews', async (req, res) => {
+    try {
+        const { doctorId, patientEmail, limit } = req.query;
+        const query = {};
+
+        if (doctorId) query.doctorId = doctorId;
+        if (patientEmail) query.patientEmail = patientEmail;
+
+        const parsedLimit = parseInt(limit) || 0;
+        const result = await reviewsCollection.find(query).sort({ createdAt: -1 }).limit(parsedLimit).toArray();
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to fetch reviews', error: error.message });
+    }
+});
+
+app.post('/reviews', verifyToken, async (req, res) => {
+    try {
+        const review = req.body;
+        const newReview = { ...review, createdAt: new Date() };
+        const result = await reviewsCollection.insertOne(newReview);
+
+        // update doctor average rating
+        if (review.doctorId) {
+            const allReviews = await reviewsCollection.find({ doctorId: review.doctorId }).toArray();
+            const avgRating = allReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / allReviews.length;
+            await doctorsCollection.updateOne(
+                { _id: new ObjectId(review.doctorId) },
+                { $set: { averageRating: Math.round(avgRating * 10) / 10, totalReviews: allReviews.length } }
+            );
+        }
+
+        res.status(201).send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to create review', error: error.message });
+    }
+});
+
+app.patch('/reviews/:id', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid review ID' });
+        }
+        const updatedData = { ...req.body };
+        delete updatedData._id;
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: updatedData };
+        const result = await reviewsCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to update review', error: error.message });
+    }
+});
+
+app.delete('/reviews/:id', verifyToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid review ID' });
+        }
+        const query = { _id: new ObjectId(id) };
+        const result = await reviewsCollection.deleteOne(query);
+        res.send(result);
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to delete review', error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
