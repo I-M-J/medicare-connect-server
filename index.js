@@ -65,6 +65,7 @@ async function connectDB() {
     }
 }
 
+// Seed default admin account
 async function seedAdmin() {
     try {
         const existing = await usersCollection.findOne({ email: process.env.ADMIN_EMAIL || 'admin@medicare.com' });
