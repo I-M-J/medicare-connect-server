@@ -269,6 +269,7 @@ app.get('/doctors', async (req, res) => {
         else if (sortBy === 'experience') sortOption = { experience: -1 };
         else if (sortBy === 'rating') sortOption = { averageRating: -1 };
 
+        // Apply pagination and sorting edge cases
         const parsedPage = parseInt(page) || 1;
         const parsedLimit = parseInt(limit) || 9;
         const skip = (parsedPage - 1) * parsedLimit;
