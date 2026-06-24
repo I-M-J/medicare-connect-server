@@ -224,6 +224,25 @@ app.post('/users', async (req, res) => {
     }
 });
 
+app.post('/users/sync-role', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).send({ message: 'Email required' });
+
+        const existing = await usersCollection.findOne({ email });
+        if (existing) {
+            await client.db('medicare_connect_db').collection('user').updateOne(
+                { email },
+                { $set: { role: existing.role } }
+            );
+        }
+        res.send({ success: true });
+    }
+    catch (error) {
+        res.status(500).send({ message: 'Failed to sync role', error: error.message });
+    }
+});
+
 app.patch('/users/:id/status', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const id = req.params.id;
