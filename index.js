@@ -210,6 +210,9 @@ app.post('/users', async (req, res) => {
         const user = req.body;
         const existing = await usersCollection.findOne({ email: user.email });
         if (existing) {
+            if (existing.role === 'admin') {
+                await client.db('medicare_connect_db').collection('user').updateOne({ email: user.email }, { $set: { role: 'admin' } });
+            }
             return res.send({ message: 'User already exists', inserted: false });
         }
         const newUser = { ...user, createdAt: new Date(), status: 'active' };
@@ -338,8 +341,9 @@ app.post('/doctors', verifyToken, async (req, res) => {
         };
         const result = await doctorsCollection.insertOne(newDoctor);
 
-        // update user role to doctor
+        // update user role to doctor in both Express and Better-Auth collections
         await usersCollection.updateOne({ email: doctor.email }, { $set: { role: 'doctor' } });
+        await client.db('medicare_connect_db').collection('user').updateOne({ email: doctor.email }, { $set: { role: 'doctor' } });
 
         res.status(201).send(result);
     }
