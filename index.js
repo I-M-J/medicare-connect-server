@@ -11,10 +11,19 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // CORS configuration
 app.use(cors({
-    origin: [
-        process.env.CLIENT_URL || 'http://localhost:3000',
-        'http://localhost:3001',
-    ],
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            process.env.CLIENT_URL,
+            'http://localhost:3000',
+            'http://localhost:3001',
+        ].filter(Boolean);
+        
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
