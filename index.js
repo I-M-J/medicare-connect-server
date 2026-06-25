@@ -113,6 +113,8 @@ const checkDbConnection = async (req, res, next) => {
     next();
 };
 
+app.use(checkDbConnection);
+
 const verifyToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -727,8 +729,6 @@ app.get('/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
 app.get('/', (req, res) => {
     res.send('MediCare Connect Server is running');
 });
-
-app.use(checkDbConnection);
 
 if (process.env.NODE_ENV !== 'production') {
     app.listen(port, () => {
