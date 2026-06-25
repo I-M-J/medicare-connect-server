@@ -246,6 +246,19 @@ app.post('/users/sync-role', async (req, res) => {
                 { email },
                 { $set: { role: existing.role } }
             );
+        } else {
+            // User does not exist in Express `users` collection.
+            // This happens on Google Sign In, where Better-Auth creates them in `user`.
+            const betterAuthUser = await client.db('medicare_connect_db').collection('user').findOne({ email });
+            if (betterAuthUser) {
+                await usersCollection.insertOne({
+                    name: betterAuthUser.name || 'User',
+                    email,
+                    role: betterAuthUser.role || 'patient',
+                    status: betterAuthUser.status || 'active',
+                    createdAt: new Date()
+                });
+            }
         }
         res.send({ success: true });
     }
